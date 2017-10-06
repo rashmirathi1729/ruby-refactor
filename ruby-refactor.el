@@ -448,6 +448,78 @@ If a region is not selected, the transformation uses the current line."
         (ruby-indent-line)
         (search-backward conditional)))))
 
+(defun convert-to-guard-clause ()
+  (interactive)
+  (message "eell"))
+(global-set-key (kbd "<f1>") 'convert-to-guard-clause)
+
+(defun switch-if ()
+  (interactive)
+  (let ((if-line (chomp (thing-at-point 'line))))
+    (kill-whole-line)
+    (end-of-line)
+    (insert " ")
+    (insert if-line)
+    (next-line)
+    (kill-whole-line)
+    (previous-line)
+    (ruby-indent-line)))
+
+(defun chomp (str)
+  "Chomp leading and tailing whitespace from STR."
+  (while (string-match "\\`\n+\\|^\\s-+\\|\\s-+$\\|\n+\\'"
+                       str)
+    (setq str (replace-match "" t t str)))
+  str)
+
+(defun range-of-block ()
+  (interactive)
+  (save-excursion
+   (let (
+         (start (progn
+                  (ruby-beginning-of-block)
+                  (point)))
+         (end (progn
+                (ruby-end-of-block)
+                (point)))
+         )
+     (list start end))))
+
+(defun parse-var ()
+  (let* ((var-name (thing-at-point 'symbol))
+         (current-line (thing-at-point 'line))
+         (var-value (progn
+                      (string-match ".*=\s?*\\(.*\\)" current-line)
+                      (match-string 1 current-line))))
+    (list var-name var-value)))
+
+(defun inline-temp ()
+  (interactive)
+  (save-excursion
+   (save-restriction
+     (let* ((var-name (car (parse-var)))
+            (range (range-of-block))
+            (var-value (cadr (parse-var)))
+            ;; (var-replace-re (format "[\\(|\s*]\\(%s\\)[\.|\s]?" var-name)))
+            (var-replace-re (format "\\b\\(%s\\)\\b" var-name)))
+       (narrow-to-region (car range) (cadr range))
+       (kill-whole-line)
+       (while (search-forward-regexp var-replace-re nil t)
+         (replace-match var-value 'nil 'nil 'nil 1))))))
+
+(defun rename-var ()
+  (interactive)
+  (save-excursion
+    (save-restriction
+     (let* ((var-name (car (parse-var)))
+            (new-name (read-string (format "New name for %s: " var-name)))
+            (range (range-of-block))
+            (var-replace-re (format "\\b\\(%s\\)\\b" var-name)))
+       (narrow-to-region (car range) (cadr range))
+       (goto-char (- (point) 1))
+       (while (search-forward-regexp var-replace-re nil t)
+         (replace-match new-name 'nil 'nil 'nil 1))))))
+
 ;;;###autoload
 (define-minor-mode ruby-refactor-mode
   "Ruby Refactor minor mode"
